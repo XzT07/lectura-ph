@@ -274,20 +274,30 @@ def _scale_html():
 
 with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 2026",
                theme=gr.themes.Base()) as demo:
-    # Fuerza la cámara TRASERA en móviles: intercepta la petición de cámara del
-    # navegador y pide facingMode 'environment' (trasera). Sin esto, muchos
-    # celulares abren la frontal por defecto en la webcam de Gradio.
+    # Fuerza la cámara TRASERA en móviles. Estrategia doble: (1) reescribe las
+    # restricciones para pedir facingMode 'environment'; (2) si el navegador da
+    # varias cámaras, busca por etiqueta una trasera ("back"/"rear"/"environment")
+    # y la selecciona por deviceId. En laptop con cámara USB no interfiere.
     gr.HTML("""
     <script>
     (function(){
-      if (!navigator.mediaDevices) return;
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) return;
       const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-      navigator.mediaDevices.getUserMedia = function(constraints){
+      navigator.mediaDevices.getUserMedia = async function(constraints){
         try {
           if (constraints && constraints.video) {
             if (constraints.video === true) constraints.video = {};
-            // preferir la cámara trasera
             constraints.video.facingMode = { ideal: "environment" };
+            // intentar localizar una cámara trasera por su etiqueta
+            try {
+              const devs = await navigator.mediaDevices.enumerateDevices();
+              const cams = devs.filter(d => d.kind === "videoinput");
+              const trasera = cams.find(d => /back|rear|environment|trasera/i.test(d.label));
+              if (trasera) {
+                constraints.video.deviceId = { exact: trasera.deviceId };
+                delete constraints.video.facingMode;
+              }
+            } catch(e){}
           }
         } catch(e){}
         return orig(constraints);
@@ -308,15 +318,15 @@ with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 20
       <div class='rx-steps'>
         <div class='rx-step'>
           <div class='rx-step-n'>PASO 1</div>
-          <div class='rx-step-t'>Fotografíe el parche</div>
-          <div class='rx-step-d'>Con buena luz y el parche llenando el encuadre,
-          sin retirar el vendaje.</div>
+          <div class='rx-step-t'>Capture el parche</div>
+          <div class='rx-step-d'>En computadora, use la cámara en vivo. En celular,
+          toque "subir" y elija tomar foto: se abre la cámara del teléfono.</div>
         </div>
         <div class='rx-step'>
           <div class='rx-step-n'>PASO 2</div>
           <div class='rx-step-t'>Cargue la imagen</div>
-          <div class='rx-step-d'>Arrastre o seleccione la foto en el panel de la
-          izquierda.</div>
+          <div class='rx-step-d'>Con buena luz y el parche llenando el encuadre,
+          sin retirar el vendaje.</div>
         </div>
         <div class='rx-step'>
           <div class='rx-step-n'>PASO 3</div>

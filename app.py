@@ -115,16 +115,22 @@ def analizar(imagen):
                  "Suba una fotografía del parche para obtener el diagnóstico "
                  "preliminar.</div>")
         return vacio, None
-    # Las fotos de celular son muy grandes (varios megapíxeles) y hacen lento el
-    # procesamiento. Se reduce el lado mayor a 1024 px antes de analizar; el
-    # color no cambia y el análisis se vuelve rápido.
+
+    import gc
+    # PROTECCIÓN DE MEMORIA (crítica para el plan gratuito):
+    # Las fotos de celular pueden ser de 50 MP. Se reduce la imagen a un tamaño
+    # de trabajo pequeño LO ANTES POSIBLE, y se usa PIL (que decodifica de forma
+    # más liviana que cargar todo a numpy). El color no se altera.
     imagen = imagen.convert("RGB")
-    MAX_LADO = 1024
+
+    # Reducir de forma escalonada: si es enorme, usar thumbnail (in-place,
+    # eficiente en memoria) para bajar el lado mayor a 800 px como máximo.
+    MAX_LADO = 800
     if max(imagen.size) > MAX_LADO:
-        escala = MAX_LADO / max(imagen.size)
-        nuevo = (int(imagen.size[0]*escala), int(imagen.size[1]*escala))
-        imagen = imagen.resize(nuevo)
+        imagen.thumbnail((MAX_LADO, MAX_LADO))   # in-place, libera el original
+
     arr = np.array(imagen)
+    del imagen
     recorte = recortar_parche(arr)
     img = cv2.resize(recorte, (IMG_SIZE, IMG_SIZE))
     x = img.astype("float32")[None, ...]
@@ -176,8 +182,10 @@ def analizar(imagen):
     </div>
     """
     recorte_vis = cv2.resize(recorte, (170, 170))
-    # Liberar los arrays grandes de la imagen para no acumular memoria
-    del arr, img, x
+    # Liberar arrays grandes y forzar recolección de basura para no acumular
+    # memoria entre peticiones (importante en el plan gratuito).
+    del arr, img, x, recorte
+    gc.collect()
     return html, recorte_vis
 
 
@@ -322,11 +330,15 @@ with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 20
       </div>
     """)
 
-    entrada.change(fn=analizar, inputs=entrada, outputs=[salida, recorte_out])
+    entrada.change(fn=analizar, inputs=entrada, outputs=[salida, recorte_out],
+                   concurrency_limit=1)
 
 if __name__ == "__main__":
     # Render asigna el puerto por la variable de entorno PORT.
     # server_name 0.0.0.0 hace que escuche en toda la red del contenedor.
+    # max_threads y una cola con límite evitan que varias imágenes se procesen
+    # a la vez y disparen la memoria en el plan gratuito.
     import os
     puerto = int(os.environ.get("PORT", 7860))
-    demo.launch(server_name="0.0.0.0", server_port=puerto)
+    demo.queue(default_concurrency_limit=1, max_size=8)
+    demo.launch(server_name="0.0.0.0", server_port=puerto, max_threads=2)

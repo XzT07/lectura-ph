@@ -15,11 +15,17 @@ import os
 os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 
 import numpy as np
-import tensorflow as tf
 import gradio as gr
 import cv2
+# Runtime ligero de TFLite (mucho menos memoria que TensorFlow completo).
+# En Render usamos el paquete "ai-edge-litert" que provee el interprete.
+try:
+    from ai_edge_litert.interpreter import Interpreter
+except ImportError:
+    # alternativa: interprete de tensorflow si estuviera disponible
+    from tensorflow.lite import Interpreter
 
-MODELO = "modelo_ph_antocianina.keras"
+MODELO = "modelo_ph_antocianina.tflite"
 IMG_SIZE = 227
 PH_VALORES = [4, 5, 6, 7, 8, 9, 10]
 
@@ -78,18 +84,26 @@ def recortar_parche(img_rgb):
     return img_rgb[y0:y1, x0:x1]
 
 
-# El modelo se descarga desde un repositorio de modelos de Hugging Face
-# (gratuito para almacenar) la primera vez que arranca la app. Reemplaza
-# REPO_MODELO con tu usuario y nombre de repo, p.ej. "gabriel/lectura-ph-modelo".
+# El modelo TFLite se descarga desde el repositorio de Hugging Face al arrancar.
 from huggingface_hub import hf_hub_download
 
-REPO_MODELO = os.environ.get("REPO_MODELO", "TU_USUARIO/lectura-ph-modelo")
+REPO_MODELO = os.environ.get("REPO_MODELO", "XzT07/lectura-ph-modelo")
 
-print("Descargando modelo desde Hugging Face...")
+print("Descargando modelo TFLite desde Hugging Face...")
 ruta_modelo = hf_hub_download(repo_id=REPO_MODELO, filename=MODELO)
 print("Cargando modelo...")
-model = tf.keras.models.load_model(ruta_modelo, compile=False)
+interpreter = Interpreter(model_path=ruta_modelo)
+interpreter.allocate_tensors()
+_in = interpreter.get_input_details()[0]
+_out = interpreter.get_output_details()[0]
 print("Modelo cargado. Iniciando interfaz...")
+
+
+def _predecir(x):
+    """Inferencia con TFLite. x: array (1,227,227,3) float32."""
+    interpreter.set_tensor(_in["index"], x.astype(np.float32))
+    interpreter.invoke()
+    return interpreter.get_tensor(_out["index"])[0]
 
 
 def analizar(imagen):
@@ -102,7 +116,7 @@ def analizar(imagen):
     recorte = recortar_parche(arr)
     img = cv2.resize(recorte, (IMG_SIZE, IMG_SIZE))
     x = img.astype("float32")[None, ...]
-    probs = model.predict(x, verbose=0)[0]
+    probs = _predecir(x)
     idx = int(np.argmax(probs))
     ph = PH_VALORES[idx]
     conf = float(probs[idx]) * 100

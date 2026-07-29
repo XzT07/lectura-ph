@@ -17,6 +17,9 @@ os.environ["TF_CPP_MIN_LOG_LEVEL"] = "2"
 import numpy as np
 import gradio as gr
 import cv2
+# Limitar hilos de OpenCV: en un servidor con poca RAM, menos hilos = menos
+# memoria y suficiente para esta tarea ligera.
+cv2.setNumThreads(1)
 # Runtime ligero de TFLite (mucho menos memoria que TensorFlow completo).
 # En Render usamos el paquete "ai-edge-litert" que provee el interprete.
 try:
@@ -112,7 +115,16 @@ def analizar(imagen):
                  "Suba una fotografía del parche para obtener el diagnóstico "
                  "preliminar.</div>")
         return vacio, None
-    arr = np.array(imagen.convert("RGB"))
+    # Las fotos de celular son muy grandes (varios megapíxeles) y hacen lento el
+    # procesamiento. Se reduce el lado mayor a 1024 px antes de analizar; el
+    # color no cambia y el análisis se vuelve rápido.
+    imagen = imagen.convert("RGB")
+    MAX_LADO = 1024
+    if max(imagen.size) > MAX_LADO:
+        escala = MAX_LADO / max(imagen.size)
+        nuevo = (int(imagen.size[0]*escala), int(imagen.size[1]*escala))
+        imagen = imagen.resize(nuevo)
+    arr = np.array(imagen)
     recorte = recortar_parche(arr)
     img = cv2.resize(recorte, (IMG_SIZE, IMG_SIZE))
     x = img.astype("float32")[None, ...]
@@ -164,6 +176,8 @@ def analizar(imagen):
     </div>
     """
     recorte_vis = cv2.resize(recorte, (170, 170))
+    # Liberar los arrays grandes de la imagen para no acumular memoria
+    del arr, img, x
     return html, recorte_vis
 
 

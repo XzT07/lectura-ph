@@ -274,6 +274,27 @@ def _scale_html():
 
 with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 2026",
                theme=gr.themes.Base()) as demo:
+    # Fuerza la cámara TRASERA en móviles: intercepta la petición de cámara del
+    # navegador y pide facingMode 'environment' (trasera). Sin esto, muchos
+    # celulares abren la frontal por defecto en la webcam de Gradio.
+    gr.HTML("""
+    <script>
+    (function(){
+      if (!navigator.mediaDevices) return;
+      const orig = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+      navigator.mediaDevices.getUserMedia = function(constraints){
+        try {
+          if (constraints && constraints.video) {
+            if (constraints.video === true) constraints.video = {};
+            // preferir la cámara trasera
+            constraints.video.facingMode = { ideal: "environment" };
+          }
+        } catch(e){}
+        return orig(constraints);
+      };
+    })();
+    </script>
+    """)
     gr.HTML(f"""
       <div class='rx-header'>
         <div class='rx-eyebrow'>Feria de Proyectos de Ingeniería 2026 · U. Latina de Panamá</div>
@@ -313,7 +334,11 @@ with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 20
 
     with gr.Row(equal_height=False):
         with gr.Column(scale=1):
+            # sources: subir archivo (usa la cámara nativa del móvil, donde sí
+            # se elige la trasera) y webcam. En móvil, "upload" abre la cámara
+            # del teléfono con control real de cuál cámara usar.
             entrada = gr.Image(type="pil", label="Fotografía del parche",
+                               sources=["upload", "webcam"],
                                elem_classes="rx-card", height=330)
             recorte_out = gr.Image(label="Región analizada por el modelo",
                                    height=170, elem_classes="rx-card")

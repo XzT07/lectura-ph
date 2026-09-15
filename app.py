@@ -301,7 +301,7 @@ with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 20
     """)
     gr.HTML(f"""
       <div class='rx-header'>
-        <div class='rx-eyebrow'>Feria de Proyectos de Ingeniería 2026 · U. Latina de Panamá</div>
+        <div class='rx-eyebrow'>Jornada de Iniciación Científica UTP 2026</div>
         <div class='rx-title'>Lectura óptica de pH en heridas</div>
         <div class='rx-sub'>Sistema de apoyo diagnóstico basado en un parche
         colorimétrico de quitosano con antocianina. La red neuronal estima el pH
@@ -353,7 +353,7 @@ with gr.Blocks(css=CSS, title="Lectura óptica de pH — Feria de Ingeniería 20
 
     gr.HTML("""
       <div class='rx-foot'>
-        Escuela de Ingeniería Biomédica · Universidad Latina de Panamá ·
+        JIC 2026 · Universidad Tecnológica de Panamá ·
         El modelo se ejecuta localmente sobre la red neuronal entrenada.
         Resultado orientativo, no sustituye la valoración médica.
       </div>

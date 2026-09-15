@@ -1,10 +1,4 @@
 """
-Sistema de lectura óptica de pH en heridas — demo con modelo real.
-
-Interfaz de instrumento para la Feria de Proyectos de Ingeniería 2026.
-Analiza la foto de un parche colorimétrico de quitosano con antocianina y
-emite un diagnóstico preliminar del pH con su nivel de confianza.
-
 REQUISITOS:
     py -3.12 -m pip install tensorflow gradio pillow numpy opencv-python
 
